@@ -1,12 +1,20 @@
 name := "cats-bio"
 
-version := "0.1"
+version := "0.6"
 
 scalaVersion in ThisBuild := "2.12.8"
 
+val credentialsLocation: RichFile =
+  sys.props.get("credentials.location").map(Path(_)).getOrElse(Path.userHome / ".ivy2" / ".user-credentials")
+val repoHost = IO.readLines((Path.userHome / ".ivy2" / ".itv-repo").asFile).head
+
 val common = Seq(
+  organization := "com.itv",
   resolvers += Resolver.sonatypeRepo("releases"),
   resolvers += Resolver.sonatypeRepo("snapshots"),
+  credentials += Credentials(credentialsLocation.asFile),
+  publishMavenStyle := true,
+  publishTo in ThisBuild := Some("itvrepos" at repoHost),
 
   addCompilerPlugin("org.spire-math" %% "kind-projector" % "0.9.8"),
 
@@ -36,9 +44,12 @@ scalacOptions in ThisBuild ++= Seq(
   "-Xlint:-missing-interpolator,_"
 )
 
-lazy val core = project.in(file(".")).settings(common)
+lazy val core = project.in(file(".")).settings(common).settings(
+  name := "cats-bio-core"
+)
 
 lazy val bench = project.in(file("bench")).settings(common).dependsOn(core).enablePlugins(JmhPlugin).settings(
+  name := "cats-bio-bench",
   libraryDependencies ++= Seq(
     "org.scalaz" %% "scalaz-ioeffect" % "2.0.0"
   )
