@@ -23,7 +23,7 @@ import cats.effect.bio.internals.IORunLoop.CustomException
 
 import scala.annotation.unchecked.uncheckedVariance
 import scala.concurrent.duration._
-import scala.concurrent.{ExecutionContext, Future, Promise, TimeoutException}
+import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.control.NonFatal
 import scala.util.{Left, Right}
 import cats.effect.internals.IOPlatform.fusionMaxStackDepth
@@ -416,7 +416,7 @@ sealed abstract class BIO[+E, +A] {
     *                 forks the involved tasks
     */
   final def timeoutTo[E1 >: E, A2 >: A](duration: FiniteDuration, fallback: BIO[E1, A2])
-                              (implicit timer: Timer[BIO[E1, ?]], cs: ContextShift[BIO[E1, ?]], F: Concurrent[BIO[E1, ?]]): BIO[E1, A2] =
+                              (implicit timer: Timer[BIO[E1, ?]], F: Concurrent[BIO[E1, ?]]): BIO[E1, A2] =
     Concurrent.timeoutTo[BIO[E1, ?], A2](this, duration, fallback)
 
   /**
@@ -438,7 +438,7 @@ sealed abstract class BIO[+E, +A] {
     */
   final def timeout[E1 >: E](duration: FiniteDuration)
                    (onTimeout: => E1)
-                   (implicit timer: Timer[BIO[E1, ?]], cs: ContextShift[BIO[E1, ?]], F: Concurrent[BIO[E1, ?]]): BIO[E1, A] =
+                   (implicit timer: Timer[BIO[E1, ?]], F: Concurrent[BIO[E1, ?]]): BIO[E1, A] =
     timeoutTo[E1, A](duration, BIO.raiseError(onTimeout))
 
   /**
@@ -1140,7 +1140,7 @@ object BIO extends IOInstances {
       conn.push(conn2.cancel)
       // The callback handles "conn.pop()"
       val cb2 = Callback.asyncIdempotent(conn, cb)
-      val fa = k(cb)
+      val fa = k(cb2)
       IORunLoop.startCancelable(fa, conn2, Callback.report)
     }
 

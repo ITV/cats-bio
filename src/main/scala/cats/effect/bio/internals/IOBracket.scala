@@ -26,7 +26,6 @@ import cats.effect.internals.TrampolineEC.immediate
 import cats.effect.{CancelToken, ExitCase}
 
 import scala.concurrent.ExecutionContext
-import scala.util.control.NonFatal
 
 private[effect] object IOBracket {
   /**

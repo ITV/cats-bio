@@ -21,10 +21,10 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 import cats.effect.bio.internals.IORunLoop.CustomException
 import cats.effect.internals.Logger
+import cats.effect.internals.TrampolineEC._
 
 import scala.concurrent.Promise
-import scala.util.{Failure, Left, Success, Try}
-import cats.effect.internals.TrampolineEC._
+import scala.util.{Left, Success}
 /**
   * Internal API — utilities for working with `IO.async` callbacks.
   */

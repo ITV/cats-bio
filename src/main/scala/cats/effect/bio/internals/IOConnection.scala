@@ -19,11 +19,9 @@ package cats.effect.bio.internals
 import java.util.concurrent.atomic.AtomicReference
 
 import cats.effect.CancelToken
-import cats.effect.bBIO.internals.CancelUtils
 import cats.effect.bio.BIO
 
 import scala.annotation.tailrec
-import scala.annotation.unchecked.uncheckedVariance
 
 /**
   * INTERNAL API — Represents a composite of functions

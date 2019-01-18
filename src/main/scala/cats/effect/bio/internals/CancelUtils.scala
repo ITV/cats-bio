@@ -1,4 +1,5 @@
-package cats.effect.bBIO.internals
+package cats.effect.bio.internals
+
 /*
  * Copyright (c) 2017-2019 The Typelevel Cats-effect Project Developers
  *
@@ -17,7 +18,6 @@ package cats.effect.bBIO.internals
 
 import cats.effect.CancelToken
 import cats.effect.bio.BIO
-import cats.effect.bio.internals.IOFrame
 import cats.effect.bio.internals.IORunLoop.CustomException
 import cats.effect.internals.Logger
 
