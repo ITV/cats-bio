@@ -96,7 +96,7 @@ private[effect] object IOConnection {
     * Reusable [[IOConnection[E]]] reference that cannot
     * be canceled.
     */
-  def uncancelable[E]: IOConnection[E] =
+  val uncancelable: IOConnection[Nothing] =
     new Uncancelable
 
   private final class Uncancelable[E] extends IOConnection[E] {
