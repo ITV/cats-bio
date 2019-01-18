@@ -100,7 +100,7 @@ private[effect] object IORunLoop {
 
 
         case RaiseError(ex) =>
-          findErrorHandler[Any](bFirst, bRest) match {
+          findErrorHandler(bFirst, bRest) match {
             case null =>
               cb(Left(ex))
               return
@@ -198,11 +198,11 @@ private[effect] object IORunLoop {
           currentIO = try thunk() catch { case NonFatal(ex) => RaiseError(f(ex)) }
 
         case RaiseError(ex) =>
-          findErrorHandler[Any](bFirst, bRest) match {
+          findErrorHandler(bFirst, bRest) match {
             case null =>
               return currentIO.asInstanceOf[BIO[E, A]]
             case bind =>
-              val fa = try bind.recover(ex) catch { case NonFatal(e) => RaiseError(e) }
+              val fa = bind.recover(ex)
               bFirst = null
               currentIO = fa.asInstanceOf[Current]
           }
@@ -261,7 +261,7 @@ private[effect] object IORunLoop {
     * anything — an optimization for `handleError`.
     */
   private def popNextBind(bFirst: Bind, bRest: CallStack): Bind = {
-    if ((bFirst ne null) && !bFirst.isInstanceOf[IOFrame.ErrorHandler[_, _, _, _]])
+    if ((bFirst ne null) && !bFirst.isInstanceOf[IOFrame.ErrorHandler[_, _]])
       return bFirst
 
     if (bRest eq null) return null
@@ -269,7 +269,7 @@ private[effect] object IORunLoop {
       val next = bRest.pop()
       if (next eq null) {
         return null
-      } else if (!next.isInstanceOf[IOFrame.ErrorHandler[_, _, _, _]]) {
+      } else if (!next.isInstanceOf[IOFrame.ErrorHandler[_, _]]) {
         return next
       }
     } while (true)
@@ -282,9 +282,9 @@ private[effect] object IORunLoop {
     * Finds a [[IOFrame]] capable of handling errors in our bind
     * call-stack, invoked after a `RaiseError` is observed.
     */
-  private def findErrorHandler[E](bFirst: Bind, bRest: CallStack): IOFrame[E, Any, BIO[E, Any]] = {
+  private def findErrorHandler(bFirst: Bind, bRest: CallStack): IOFrame[Any, Any, BIO[Any, Any]] = {
     bFirst match {
-      case ref: IOFrame[E, Any, BIO[E, Any]] @unchecked => ref
+      case ref: IOFrame[Any, Any, BIO[Any, Any]] @unchecked => ref
       case _ =>
         if (bRest eq null) null else {
           do {
@@ -292,7 +292,7 @@ private[effect] object IORunLoop {
             if (ref eq null)
               return null
             else if (ref.isInstanceOf[IOFrame[_, _, _]])
-              return ref.asInstanceOf[IOFrame[E, Any, BIO[E, Any]]]
+              return ref.asInstanceOf[IOFrame[Any, Any, BIO[Any, Any]]]
           } while (true)
           // $COVERAGE-OFF$
           null

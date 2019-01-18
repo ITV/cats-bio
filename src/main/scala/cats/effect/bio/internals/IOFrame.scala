@@ -46,11 +46,11 @@ private[effect] object IOFrame {
   /** [[IOFrame]] reference that only handles errors, useful for
     * quick filtering of `onErrorHandleWith` frames.
     */
-  final class ErrorHandler[E, E1, A, A1](fe: E => BIO[E1, A1], g: A => BIO[E1, A1])
-    extends IOFrame[E, A, BIO[E1, A1]] {
+  final class ErrorHandler[E, A](fe: E => BIO[E, A])
+    extends IOFrame[E, A, BIO[E, A]] {
 
-    def recover(e: E): BIO[E1, A1] = fe(e)
-    def apply(a: A): BIO[E1, A1] = g(a)
+    def recover(e: E): BIO[E, A] = fe(e)
+    def apply(a: A): BIO[E, A] = BIO.pure(a)
   }
 
   /** Used by [[BIO.redeem]]. */
@@ -62,10 +62,10 @@ private[effect] object IOFrame {
   }
 
   /** Used by [[BIO.redeemWith]]. */
-  final class RedeemWith[E, A, B](fe: E => BIO[E, B], fs: A => BIO[E, B])
-    extends IOFrame[E, A, BIO[E, B]] {
+  final class RedeemWith[E, E1, A, B](fe: E => BIO[E1, B], fs: A => BIO[E1, B])
+    extends IOFrame[E, A, BIO[E1, B]] {
 
-    def apply(a: A): BIO[E, B] = fs(a)
-    def recover(e: E): BIO[E, B] = fe(e)
+    def apply(a: A): BIO[E1, B] = fs(a)
+    def recover(e: E): BIO[E1, B] = fe(e)
   }
 }

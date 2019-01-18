@@ -643,7 +643,7 @@ sealed abstract class BIO[+E, +A] {
     * Implements `ApplicativeError.handleErrorWith`.
     */
   def handleErrorWith[E1 >: E, AA >: A](f: E1 => BIO[E1, AA]): BIO[E1, AA] =
-    BIO.Bind(this, new IOFrame.ErrorHandler(f, BIO.pure[E1, AA]))
+    BIO.Bind(this, new IOFrame.ErrorHandler(f))
 
   /**
     * Returns a new value that transforms the result of the source,
@@ -754,7 +754,7 @@ private[effect] abstract class IOLowPriorityInstances extends IOParallelNewtype 
     override def attempt[A](ioa: BIO[E, A]): BIO[E, Either[E, A]] =
       ioa.attempt
     override def handleErrorWith[A](ioa: BIO[E, A])(f: E => BIO[E, A]): BIO[E, A] =
-      BIO.Bind(ioa, new IOFrame.ErrorHandler(f, BIO.pure[E, A]))
+      ioa.handleErrorWith(f)
     override def raiseError[A](e: E): BIO[E, A] =
       BIO.raiseError(e)
 
