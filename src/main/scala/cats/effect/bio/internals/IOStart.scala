@@ -18,7 +18,6 @@ package cats.effect.bio.internals
 
 import cats.effect.{ContextShift, Fiber}
 import cats.effect.bio.BIO
-import cats.implicits._
 
 import scala.concurrent.Promise
 import cats.effect.internals.TrampolineEC.immediate
@@ -43,5 +42,5 @@ private[effect] object IOStart {
   }
 
   private[internals] def fiber[E, A](p: Promise[Either[E, A]], conn: IOConnection[E]): Fiber[BIO[E, ?], A] =
-    Fiber[BIO[E, ?], A](BIO.async(fn => p.future.onSuccess { case thing => fn(thing) }(immediate)), conn.cancel)
+    Fiber[BIO[E, ?], A](BIO.async(p.future.foreach(_)(immediate)), conn.cancel)
 }
