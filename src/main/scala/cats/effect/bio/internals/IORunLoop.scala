@@ -51,9 +51,9 @@ private[effect] object IORunLoop {
     * nullable values that can be supplied because the loop needs
     * to be resumed in [[RestartCallback]].
     */
-  private def loop[E](
+  private def loop(
                     source: Current,
-                    cancelable: IOConnection[E],
+                    cancelable: IOConnection[Any],
                     cb: Either[Any, Any] => Unit,
                     rcbRef: RestartCallback,
                     bFirstRef: Bind,
@@ -61,7 +61,7 @@ private[effect] object IORunLoop {
 
     var currentIO: Current = source
     // Can change on a context switch
-    var conn: IOConnection[E] = cancelable
+    var conn: IOConnection[Any] = cancelable
     var bFirst: Bind = bFirstRef
     var bRest: CallStack = bRestRef
     var rcb: RestartCallback = rcbRef
@@ -105,7 +105,7 @@ private[effect] object IORunLoop {
               cb(Left(ex))
               return
             case bind =>
-              val fa = try bind.recover(ex) catch { case NonFatal(e) => RaiseError(e) }
+              val fa = bind.recover(ex)
               bFirst = null
               currentIO = fa.asInstanceOf[Current]
           }
@@ -119,19 +119,19 @@ private[effect] object IORunLoop {
           currentIO = fa
 
         case async @ Async(_, _) =>
-          if (conn eq null) conn = IOConnection[E]()
-          if (rcb eq null) rcb = new RestartCallback(conn, cb.asInstanceOf[Callback])
+          if (conn eq null) conn = IOConnection[Any]()
+          if (rcb eq null) rcb = new RestartCallback(conn, cb)
           rcb.start(async, bFirst, bRest)
           return
 
         case ContextSwitch(next, modify, restore) =>
-          val old = if (conn ne null) conn else IOConnection[E]()
-          conn = modify(old).asInstanceOf[IOConnection[E]]
+          val old = if (conn ne null) conn else IOConnection[Any]()
+          conn = modify(old)
           currentIO = next
           if (conn ne old) {
             if (rcb ne null) rcb.contextSwitch(conn)
             if (restore ne null)
-              currentIO = Bind[Any, Any, Any, Any](next, new RestoreContext(old, restore.asInstanceOf[(Any, Any, IOConnection[Any], IOConnection[Any]) => IOConnection[Any]]))
+              currentIO = Bind(next, new RestoreContext(old, restore))
           }
       }
 
@@ -141,7 +141,7 @@ private[effect] object IORunLoop {
             cb(Right(unboxed))
             return
           case bind =>
-            val fa = try bind(unboxed) catch { case NonFatal(ex) => RaiseError(ex) }
+            val fa = bind(unboxed)
             hasUnboxed = false
             unboxed = null
             bFirst = null
@@ -218,7 +218,7 @@ private[effect] object IORunLoop {
         case _ =>
           // Cannot inline the code of this method — as it would
           // box those vars in scala.runtime.ObjectRef!
-          return suspendInAsync(currentIO, bFirst, bRest).asInstanceOf[BIO[E, A]]
+          return suspendInAsync[E, A](currentIO.asInstanceOf[BIO[E, A]], bFirst, bRest)
       }
 
       if (hasUnboxed) {
@@ -227,7 +227,7 @@ private[effect] object IORunLoop {
             return (if (currentIO ne null) currentIO else Pure(unboxed))
               .asInstanceOf[BIO[E, A]]
           case bind =>
-            currentIO = try bind(unboxed) catch { case NonFatal(ex) => RaiseError(ex) }
+            currentIO = bind(unboxed)
             hasUnboxed = false
             unboxed = null
             bFirst = null
