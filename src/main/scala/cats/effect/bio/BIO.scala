@@ -385,8 +385,8 @@ sealed abstract class BIO[+E, +A] {
     * finishes in error. In that case the second task doesn't get canceled,
     * which creates a potential memory leak.
     */
-  final def start[E1 >: E](implicit cs: ContextShift[BIO[E1, ?]], F: Concurrent[BIO[E1, ?]]): BIO[E1, Fiber[BIO[E1, ?], A @uncheckedVariance]] =
-    IOStart(cs, this)
+  final def start[E1 >: E]: BIO[E1, Fiber[BIO[E1, ?], A @uncheckedVariance]] =
+    IOStart(this)
 
   /**
     * Makes the source `IO` uninterruptible such that a [[Fiber.cancel]]
@@ -851,7 +851,7 @@ private[effect] abstract class IOInstances extends IOLowPriorityInstances {
       ioa.runAsync(cb.andThen(liftIO))
   }
 
-  implicit def ioConcurrentEffect(implicit cs: ContextShift[BIO[Throwable, ?]]): ConcurrentEffect[BIO[Throwable, ?]] =
+  implicit def ioConcurrentEffect: ConcurrentEffect[BIO[Throwable, ?]] =
     new IOEffect with ConcurrentEffect[BIO[Throwable, ?]] {
       final override def start[A](fa: BIO[Throwable, A]): BIO[Throwable, Fiber[BIO[Throwable, ?], A]] =
         fa.start
@@ -1370,8 +1370,8 @@ object BIO extends IOInstances {
     * @param cs is an implicit requirement needed because
     *        `race` automatically forks the involved tasks
     */
-  def race[E, A, B](lh: BIO[E, A], rh: BIO[E, B])(implicit cs: ContextShift[BIO[E, ?]]): BIO[E, Either[A, B]] =
-    IORace.simple(cs, lh, rh)
+  def race[E, A, B](lh: BIO[E, A], rh: BIO[E, B]): BIO[E, Either[A, B]] =
+    IORace.simple(lh, rh)
 
   /**
     * Run two IO tasks concurrently, and returns a pair
@@ -1406,8 +1406,8 @@ object BIO extends IOInstances {
     * @param cs is an implicit requirement needed because
     *        `race` automatically forks the involved tasks
     */
-  def racePair[E, A, B](lh: BIO[E, A], rh: BIO[E, B])(implicit cs: ContextShift[BIO[E, ?]], F: Concurrent[BIO[E, ?]]): BIO[E, Either[(A, Fiber[BIO[E, ?], B]), (Fiber[BIO[E, ?], A], B)]] =
-    IORace.pair(cs, lh, rh)
+  def racePair[E, A, B](lh: BIO[E, A], rh: BIO[E, B]): BIO[E, Either[(A, Fiber[BIO[E, ?], B]), (Fiber[BIO[E, ?], A], B)]] =
+    IORace.pair(lh, rh)
 
   /**
     * Returns a [[ContextShift]] instance for [[BIO]], built from a

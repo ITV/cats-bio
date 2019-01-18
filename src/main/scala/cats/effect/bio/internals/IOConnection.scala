@@ -97,10 +97,22 @@ private[effect] object IOConnection {
   val uncancelable: IOConnection[Nothing] =
     new Uncancelable
 
+  val alreadyCanceled: IOConnection[Nothing] =
+    new AlreadyCanceled
+
   private final class Uncancelable[E] extends IOConnection[E] {
     def cancel[E1 >: E] = BIO.unit
     def isCanceled: Boolean = false
     def push[E1 >: E](token: CancelToken[BIO[E1, ?]]): Unit = ()
+    def pop[E1 >: E](): CancelToken[BIO[E1, ?]] = BIO.unit
+    def tryReactivate(): Boolean = true
+    def pushPair[E1 >: E](lh: IOConnection[E1], rh: IOConnection[E1]): Unit = ()
+  }
+
+  private final class AlreadyCanceled[E] extends IOConnection[E] {
+    def cancel[E1 >: E] = BIO.unit
+    def isCanceled: Boolean = true
+    def push[E1 >: E](token: CancelToken[BIO[E1, ?]]): Unit = token.unsafeRunAsyncAndForget()
     def pop[E1 >: E](): CancelToken[BIO[E1, ?]] = BIO.unit
     def tryReactivate(): Boolean = true
     def pushPair[E1 >: E](lh: IOConnection[E1], rh: IOConnection[E1]): Unit = ()

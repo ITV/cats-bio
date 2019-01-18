@@ -1,7 +1,9 @@
 package cats.effect.bio.internals
 
 import cats.effect.bio.BIO
-import cats.effect.bio.BIO.ContextSwitch
+import cats.effect.internals.TrampolineEC.immediate
+
+import scala.concurrent.ExecutionContext
 
 /*
  * Copyright (c) 2017-2019 The Typelevel Cats-effect Project Developers
@@ -19,10 +21,28 @@ import cats.effect.bio.BIO.ContextSwitch
  * limitations under the License.
  */
 
-private[effect] object IOCancel {
+private[bio] object IOCancel {
+  private[this] val ec: ExecutionContext = immediate
+
   /** Implementation for `IO.uncancelable`. */
   def uncancelable[E, A](fa: BIO[E, A]): BIO[E, A] =
-    ContextSwitch(fa, makeUncancelable[E], disableUncancelable)
+    BIO.ContextSwitch(fa, makeUncancelable[E], disableUncancelable)
+
+  /** Implementation for `IO.cancel`. */
+  def signal[E, A](fa: BIO[E, A]): BIO[E, Unit] =
+    BIO.Async[E, Unit] { (_, cb) =>
+      ec.execute(new Runnable {
+        def run(): Unit = {
+          // Ironically, in order to describe cancellation as a pure operation
+          // we have to actually execute our `IO` task - the implementation passing an
+          // IOConnection.alreadyCanceled which will cancel any pushed cancelable
+          // tokens along the way and also return `false` on `isCanceled`
+          // (relevant for `IO.cancelBoundary`)
+          IORunLoop.startCancelable(fa, IOConnection.alreadyCanceled, Callback.dummy1)
+          cb(Callback.rightUnit)
+        }
+      })
+    }
 
   /** Internal reusable reference. */
   private[this] def makeUncancelable[E]: IOConnection[E] => IOConnection[E] =

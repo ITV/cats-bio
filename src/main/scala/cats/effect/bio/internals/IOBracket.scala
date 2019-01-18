@@ -19,7 +19,6 @@ package cats.effect.bio.internals
 import java.util.concurrent.atomic.AtomicBoolean
 
 import cats.effect.bio.BIO
-import cats.effect.bio.BIO.ContextSwitch
 import cats.effect.bio.internals.IORunLoop.CustomException
 import cats.effect.internals.Logger
 import cats.effect.internals.TrampolineEC.immediate
@@ -32,9 +31,8 @@ private[effect] object IOBracket {
     * Implementation for `IO.bracketCase`.
     */
   def apply[E, A, B](acquire: BIO[E, A])
-                 (use: A => BIO[E, B])
-                 (release: (A, ExitCase[E]) => BIO[E, Unit]): BIO[E, B] = {
-
+                    (use: A => BIO[E, B])
+                    (release: (A, ExitCase[E]) => BIO[E, Unit]): BIO[E, B] = {
     BIO.Async[E, B] { (conn, cb) =>
       // Placeholder for the future finalizer
       val deferredRelease = ForwardCancelable[E]()
@@ -53,12 +51,11 @@ private[effect] object IOBracket {
   }
 
   // Internals of `IO.bracketCase`.
-  private final class BracketStart[E, A, B](
-                                          use: A => BIO[E, B],
-                                          release: (A, ExitCase[E]) => BIO[E, Unit],
-                                          conn: IOConnection[E],
-                                          deferredRelease: ForwardCancelable[E],
-                                          cb: Callback.T[E, B])
+  private final class BracketStart[E, A, B](use: A => BIO[E, B],
+                                            release: (A, ExitCase[E]) => BIO[E, Unit],
+                                            conn: IOConnection[E],
+                                            deferredRelease: ForwardCancelable[E],
+                                            cb: Callback.T[E, B])
     extends (Either[E, A] => Unit) with Runnable {
 
     // This runnable is a dirty optimization to avoid some memory allocations;
@@ -86,7 +83,7 @@ private[effect] object IOBracket {
         // Actual execution
         IORunLoop.startCancelable[E, B](onNext, conn, cb)
 
-      case error @ Left(_) =>
+      case error@Left(_) =>
         cb(error.asInstanceOf[Either[E, B]])
     }
   }
@@ -115,17 +112,14 @@ private[effect] object IOBracket {
     }
   }
 
-  private final class BracketReleaseFrame[E, A, B](
-                                                 a: A,
-                                                 releaseFn: (A, ExitCase[E]) => BIO[E, Unit])
+  private final class BracketReleaseFrame[E, A, B](a: A, releaseFn: (A, ExitCase[E]) => BIO[E, Unit])
     extends BaseReleaseFrame[E, A, B] {
 
     def release(c: ExitCase[E]): CancelToken[BIO[E, ?]] =
       releaseFn(a, c)
   }
 
-  private final class EnsureReleaseFrame[E, A](
-                                             releaseFn: ExitCase[E] => BIO[E, Unit])
+  private final class EnsureReleaseFrame[E, A](releaseFn: ExitCase[E] => BIO[E, Unit])
     extends BaseReleaseFrame[E, Unit, A] {
 
     def release(c: ExitCase[E]): CancelToken[BIO[E, ?]] =
@@ -154,7 +148,7 @@ private[effect] object IOBracket {
       // Unregistering cancel token, otherwise we can have a memory leak;
       // N.B. conn.pop() happens after the evaluation of `release`, because
       // otherwise we might have a conflict with the auto-cancellation logic
-      ContextSwitch(applyRelease(ExitCase.error(e)), makeUncancelable, disableUncancelableAndPop)
+      BIO.ContextSwitch(applyRelease(ExitCase.error(e)), makeUncancelable, disableUncancelableAndPop)
         .flatMap(new ReleaseRecover(e))
     }
 
@@ -162,7 +156,7 @@ private[effect] object IOBracket {
       // Unregistering cancel token, otherwise we can have a memory leak
       // N.B. conn.pop() happens after the evaluation of `release`, because
       // otherwise we might have a conflict with the auto-cancellation logic
-      ContextSwitch(applyRelease(ExitCase.complete), makeUncancelable, disableUncancelableAndPop)
+      BIO.ContextSwitch(applyRelease(ExitCase.complete), makeUncancelable, disableUncancelableAndPop)
         .map(_ => b)
     }
   }
