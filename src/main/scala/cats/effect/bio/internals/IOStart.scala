@@ -16,31 +16,32 @@ package cats.effect.bio.internals
  * limitations under the License.
  */
 
-import cats.effect.{ContextShift, Fiber}
 import cats.effect.bio.BIO
+import cats.effect.concurrent.Deferred
+import cats.effect.{Concurrent, ContextShift, Fiber}
 
-import scala.concurrent.Promise
-import cats.effect.internals.TrampolineEC.immediate
+import scala.util.Right
 
 private[effect] object IOStart {
   /**
     * Implementation for `IO.start`.
     */
-  def apply[E, A](cs: ContextShift[BIO[E, ?]], fa: BIO[E, A]): BIO[E, Fiber[BIO[E, ?], A]] = {
+  def apply[E, A](cs: ContextShift[BIO[E, ?]], fa: BIO[E, A])(implicit F: Concurrent[BIO[E, ?]]): BIO[E, Fiber[BIO[E, ?], A]] = {
     val start: Start[E, Fiber[BIO[E, ?], A]] = (_, cb) => {
       // Memoization
-      val p = Promise[Either[E, A]]()
+      val p = Deferred.unsafe[BIO[E, ?], Either[E, A]]
 
       // Starting the source `IO`, with a new connection, because its
       // cancellation is now decoupled from our current one
       val conn2 = IOConnection[E]()
-      IORunLoop.startCancelable(IOForkedStart(fa, cs), conn2, p.success)
+      IORunLoop.startCancelable(IOForkedStart(fa, cs), conn2, (e: Either[E, A]) => p.complete(e).unsafeRunAsyncAndForget())
 
       cb(Right(fiber(p, conn2)))
     }
     BIO.Async(start, trampolineAfter = true)
   }
 
-  private[internals] def fiber[E, A](p: Promise[Either[E, A]], conn: IOConnection[E]): Fiber[BIO[E, ?], A] =
-    Fiber[BIO[E, ?], A](BIO.async(p.future.foreach(_)(immediate)), conn.cancel)
+  private[internals] def fiber[E, A](p: Deferred[BIO[E, ?], Either[E, A]], conn: IOConnection[E]): Fiber[BIO[E, ?], A] = {
+    Fiber[BIO[E, ?], A](p.get.flatMap(BIO.fromEither), conn.cancel)
+  }
 }

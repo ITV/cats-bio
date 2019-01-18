@@ -385,7 +385,7 @@ sealed abstract class BIO[+E, +A] {
     * finishes in error. In that case the second task doesn't get canceled,
     * which creates a potential memory leak.
     */
-  final def start[E1 >: E](implicit cs: ContextShift[BIO[E1, ?]]): BIO[E1, Fiber[BIO[E1, ?], A @uncheckedVariance]] =
+  final def start[E1 >: E](implicit cs: ContextShift[BIO[E1, ?]], F: Concurrent[BIO[E1, ?]]): BIO[E1, Fiber[BIO[E1, ?], A @uncheckedVariance]] =
     IOStart(cs, this)
 
   /**
@@ -1406,7 +1406,7 @@ object BIO extends IOInstances {
     * @param cs is an implicit requirement needed because
     *        `race` automatically forks the involved tasks
     */
-  def racePair[E, A, B](lh: BIO[E, A], rh: BIO[E, B])(implicit cs: ContextShift[BIO[E, ?]]): BIO[E, Either[(A, Fiber[BIO[E, ?], B]), (Fiber[BIO[E, ?], A], B)]] =
+  def racePair[E, A, B](lh: BIO[E, A], rh: BIO[E, B])(implicit cs: ContextShift[BIO[E, ?]], F: Concurrent[BIO[E, ?]]): BIO[E, Either[(A, Fiber[BIO[E, ?], B]), (Fiber[BIO[E, ?], A], B)]] =
     IORace.pair(cs, lh, rh)
 
   /**

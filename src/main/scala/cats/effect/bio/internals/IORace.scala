@@ -19,12 +19,11 @@ package cats.effect.bio.internals
 
 import java.util.concurrent.atomic.AtomicBoolean
 
-import cats.effect.{ContextShift, Fiber}
+import cats.effect.{Concurrent, ContextShift, Fiber}
 import cats.effect.bio.BIO
 import cats.effect.bio.internals.IORunLoop.CustomException
+import cats.effect.concurrent.Deferred
 import cats.effect.internals.Logger
-
-import scala.concurrent.Promise
 
 private[effect] object IORace {
   /**
@@ -104,15 +103,15 @@ private[effect] object IORace {
   /**
     * Implementation for `IO.racePair`
     */
-  def pair[E, A, B](cs: ContextShift[BIO[E, ?]], lh: BIO[E, A], rh: BIO[E, B]): BIO[E, Pair[E, A, B]] = {
+  def pair[E, A, B](cs: ContextShift[BIO[E, ?]], lh: BIO[E, A], rh: BIO[E, B])(implicit F: Concurrent[BIO[E, ?]]): BIO[E, Pair[E, A, B]] = {
     val start: Start[E, Pair[E, A, B]] = (conn, cb) => {
       val active = new AtomicBoolean(true)
       // Cancelable connection for the left value
       val connL = IOConnection[E]()
-      val promiseL = Promise[Either[E, A]]()
+      val promiseL = Deferred.unsafe[BIO[E, ?], Either[E, A]]
       // Cancelable connection for the right value
       val connR = IOConnection[E]()
-      val promiseR = Promise[Either[E, B]]()
+      val promiseR = Deferred.unsafe[BIO[E, ?], Either[E, B]]
 
       // Registers both for cancellation — gets popped right
       // before callback is invoked in onSuccess / onError
@@ -125,7 +124,7 @@ private[effect] object IORace {
             conn.pop()
             cb(Right(Left((a, IOStart.fiber[E, B](promiseR, connR)))))
           } else {
-            promiseL.trySuccess(Right(a))
+            promiseL.complete(Right(a)).unsafeRunAsyncAndForget()
           }
         case Left(err) =>
           if (active.getAndSet(false)) {
@@ -135,7 +134,7 @@ private[effect] object IORace {
               cb(Left(err))
             }
           } else {
-            promiseL.trySuccess(Left(err))
+            promiseL.complete(Left(err)).unsafeRunAsyncAndForget()
           }
       })
 
@@ -146,7 +145,7 @@ private[effect] object IORace {
             conn.pop()
             cb(Right(Right((IOStart.fiber[E, A](promiseL, connL), b))))
           } else {
-            promiseR.trySuccess(Right(b))
+            promiseR.complete(Right(b)).unsafeRunAsyncAndForget()
           }
 
         case Left(err) =>
@@ -157,7 +156,7 @@ private[effect] object IORace {
               cb(Left(err))
             }
           } else {
-            promiseR.trySuccess(Left(err))
+            promiseR.complete(Left(err)).unsafeRunAsyncAndForget()
           }
       })
     }
